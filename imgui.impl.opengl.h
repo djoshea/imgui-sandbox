@@ -1,5 +1,5 @@
-#ifndef __GUI_H_INCLUDED_
-#define __GUI_H_INCLUDED_
+#ifndef __IMGUI_IMPL_OPENGL_INCLUDED__
+#define __IMGUI_IMPL_OPENGL_INCLUDED__
 
 namespace ImGuiImpl {
     void Init(); // call once at beggining

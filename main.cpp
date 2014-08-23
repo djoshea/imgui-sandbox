@@ -1,9 +1,9 @@
 #include "imgui.custom.h"
-#include "gui.h"
-#include <string.h>		// memset
-#include <math.h>		// sqrt
+#include "imgui.impl.opengl.h"
+#include <string.h> // memset
+#include <math.h> // sqrt
+#include <stdio.h> // vsnprintf
 
-#include <stdio.h>		// vsnprintf
 void GraphWindow(bool* open);
 
 #undef ARRAYSIZE

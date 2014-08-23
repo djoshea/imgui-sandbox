@@ -1,4 +1,4 @@
-#include "imgui.h"
+#include "imgui.custom.h"
 #include "gui.h"
 #include <string.h>		// memset
 #include <math.h>		// sqrt
@@ -22,14 +22,12 @@ static size_t ImFormatString(char* buf, size_t buf_size, const char* fmt, ...)
 
 int main(int argc, char** argv)
 {
-    InitGL();
-    InitImGui();
+    ImGuiImpl::Init();
 
-    while (!GuiShouldClose())
+    while (!ImGuiImpl::ShouldClose())
     {
-        BeginFrame();
+        ImGuiImpl::BeginFrame();
 
-        // 2) ImGui usage
         static bool show_graph = true;
         static float f;
         ImGui::Text("Hello, world!");
@@ -54,10 +52,10 @@ int main(int argc, char** argv)
             GraphWindow(&show_graph);
         }
 
-        RenderFrame();
+        ImGuiImpl::RenderFrame();
     }
 
-    Shutdown();
+    ImGuiImpl::Shutdown();
     return 0;
 }
 
@@ -99,8 +97,8 @@ void GraphWindow(bool* open)
         }
         // void PlotLines(const char* label, const float* values, int values_count, int values_offset, const char* overlay_text, float scale_min, float scale_max, ImVec2 graph_size)
         for(int g = 0; g < num_graphs; g++) {
-            ImGui::PlotTight("Values", &values.front(), values.size(), (values_offset+3*g)%values.size(),
-                    "", -2.0f, 2.0f, ImVec2(100,200));
+            ImGui::PlotAnalog("Values", &values.front(), values.size(), (values_offset+3*g)%values.size(),
+                    "", -2.0f, 2.0f);
         }
     }
 

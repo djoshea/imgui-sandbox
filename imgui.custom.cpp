@@ -1,8 +1,17 @@
+// extensions to imgui.cpp
+// @djoshea
+
+// here we include the original imgui.cpp
+// this is a hack to preserve the original file so that we can keep up to date with upstream changes
+// but  since many methods are declared static, we need to "copy" the code and build in our additions into
+// the same cpp file
 #include "imgui.cpp"
 
 namespace ImGui {
 
-void PlotAnalog(const char* label, const float* values, int values_count, int values_offset, const char* overlay_text, float scale_min, float scale_max, ImVec2 graph_size, size_t stride)
+void PlotAnalog(const char* label, const char* units, const float* values, int values_count, int values_offset,
+    const char* overlay_text, float scale_min, float scale_max, bool auto_expand_scale,
+    ImVec2 graph_size, size_t stride, ImVec4 line_color)
 {
     ImGuiPlotType plot_type = ImGuiPlotType_Lines;
     ImGuiState& g = GImGui;
@@ -26,24 +35,33 @@ void PlotAnalog(const char* label, const float* values, int values_count, int va
     if (ClipAdvance(bb))
         return;
 
+    float v_min = FLT_MAX;
+    float v_max = -FLT_MAX;
+    for (int i = 0; i < values_count; i++)
+    {
+        const float v = PlotGetValue(values, stride, i);
+        v_min = ImMin(v_min, v);
+        v_max = ImMax(v_max, v);
+    }
+
     // Determine scale if not specified
     if (scale_min == FLT_MAX || scale_max == FLT_MAX)
     {
-        float v_min = FLT_MAX;
-        float v_max = -FLT_MAX;
-        for (int i = 0; i < values_count; i++)
-        {
-            const float v = PlotGetValue(values, stride, i);
-            v_min = ImMin(v_min, v);
-            v_max = ImMax(v_max, v);
-        }
         if (scale_min == FLT_MAX)
             scale_min = v_min;
         if (scale_max == FLT_MAX)
             scale_max = v_max;
     }
 
-    RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg));
+    // expand scale if requested
+    if (auto_expand_scale) {
+        scale_min = ImMin(v_min, scale_min);
+        scale_max = ImMax(v_max, scale_max);
+    }
+
+   // RenderFrame(frame_bb.Min, frame_bb.Max, window->Color(ImGuiCol_FrameBg));
+    RenderFrame(graph_bb.Min, graph_bb.Max, window->Color(ImGuiCol_FrameBg));
+    //RenderFrame(bb.Min, bb.Max, window->Color(ImGuiCol_FrameBg));
 
     int res_w = ImMin((int)graph_size.x, values_count);
     if (plot_type == ImGuiPlotType_Lines)
@@ -72,8 +90,9 @@ void PlotAnalog(const char* label, const float* values, int values_count, int va
     float t0 = 0.0f;
     ImVec2 p0 = ImVec2( t0, 1.0f - ImSaturate((v0 - scale_min) / (scale_max - scale_min)) );
 
-    const ImU32 col_base = window->Color((plot_type == ImGuiPlotType_Lines) ? ImGuiCol_PlotLines : ImGuiCol_PlotHistogram);
-    const ImU32 col_hovered = window->Color((plot_type == ImGuiPlotType_Lines) ? ImGuiCol_PlotLinesHovered : ImGuiCol_PlotHistogramHovered);
+    //const ImU32 col_base = window->Color((plot_type == ImGuiPlotType_Lines) ? ImGuiCol_PlotLines : ImGuiCol_PlotHistogram);
+    //const ImU32 col_hovered = window->Color((plot_type == ImGuiPlotType_Lines) ? ImGuiCol_PlotLinesHovered : ImGuiCol_PlotHistogramHovered);
+    const ImU32 col = window->Color(line_color);
 
     for (int n = 0; n < res_w; n++)
     {
@@ -85,20 +104,34 @@ void PlotAnalog(const char* label, const float* values, int values_count, int va
 
         // NB: draw calls are merged into ones
         if (plot_type == ImGuiPlotType_Lines)
-            window->DrawList->AddLine(ImLerp(graph_bb.Min, graph_bb.Max, p0), ImLerp(graph_bb.Min, graph_bb.Max, p1), v_hovered == v_idx ? col_hovered : col_base);
+            window->DrawList->AddLine(ImLerp(graph_bb.Min, graph_bb.Max, p0), ImLerp(graph_bb.Min, graph_bb.Max, p1), col);
         else if (plot_type == ImGuiPlotType_Histogram)
-            window->DrawList->AddRectFilled(ImLerp(graph_bb.Min, graph_bb.Max, p0), ImLerp(graph_bb.Min, graph_bb.Max, ImVec2(p1.x, 1.0f))+ImVec2(-1,0), v_hovered == v_idx ? col_hovered : col_base);
+            window->DrawList->AddRectFilled(ImLerp(graph_bb.Min, graph_bb.Max, p0), ImLerp(graph_bb.Min, graph_bb.Max, ImVec2(p1.x, 1.0f))+ImVec2(-1,0), col);
 
         v0 = v1;
         t0 = t1;
         p0 = p1;
     }
 
+    // Show Plot limits
+    char limUpper[10], limLower[10];
+    snprintf(limUpper, 10, "%+.3g", scale_max);
+    snprintf(limLower, 10, "%+.3g", scale_min);
+    float text_padding = 1;
+    RenderText(ImVec2(graph_bb.GetTR().x - CalcTextSize(limUpper).x - text_padding, graph_bb.GetTR().y - text_padding), limUpper);
+    RenderText(ImVec2(graph_bb.GetBR().x - CalcTextSize(limLower).x - text_padding, graph_bb.GetBR().y - CalcTextSize(limLower).y - text_padding), limLower);
+
     // Overlay last value
     if (overlay_text)
         RenderText(ImVec2(graph_bb.GetCenter().x-CalcTextSize(overlay_text).x*0.5f, frame_bb.Min.y + style.FramePadding.y), overlay_text);
 
+    // label on right of graph
     RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, graph_bb.Min.y), label);
+
+    ImGui::PushStyleColor(ImGuiCol_Text, ImVec4(0.5, 0.5, 0.5, 1.0));
+    // units below label
+    RenderText(ImVec2(frame_bb.Max.x + style.ItemInnerSpacing.x, graph_bb.Min.y + text_size.y + text_padding), units);
+    ImGui::PopStyleColor();
 }
 
 };
